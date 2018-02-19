@@ -4,29 +4,48 @@
 
 #include <fbxsdk.h>
 
-#include "SUNMaths.h"
+#include "SunUtilities.h"
+#include "maths/maths.h"
 #include "SUNWriter.h"
 
 using namespace std;
+using namespace sunny;
+using namespace maths;
 
-static vector<sun::Vertex>                  s_vertices;  // 정점
-static vector<uint>                          s_indices;  // 인덱스
-static unordered_map<sun::Vertex, uint> s_indexMapping;  // 정점+인덱스 맵핑
+static vector<sun::VertexWithBlending>                  s_vertices;     // 정점
+static vector<uint>                                     s_indices;      // 인덱스
+static unordered_map<sun::VertexWithBlending, uint>    s_indexMapping;  // 정점+인덱스 맵핑
 
-static sun::vec3* s_rawPositions;                        // 정점 위치
+static sun::Position* s_rawPositions;                    // 정점 위치, 애니메이션
+static uint s_rawPositionCount;
 
 static String s_name, s_inputName, s_outputName;
 
+
+static FbxAMatrix s_rootMatrix;                            // STR
+
+static sun::Skeleton s_skeleton;                         // 뼈(std::vector<Joint> joints;)
+
+static bool s_hasAnimation;
+
+static FbxTime s_AnimationStart, s_AnimationEnd;           // 애니메이션 시작과 종료 시간
+static size_t s_AnimationLength = 1;                  // 애니메이션 길이(종료 - 시작)
+
+void LoadJoint(FbxNode* node, int depth, int index, int parentIndex);
 void LoadNode(FbxNode* node);
-bool ParseSave(FbxMesh* mesh);
 
+
+bool      ParseMesh         (      FbxMesh* mesh);
 void      ParseControlPoints(const FbxMesh* mesh);
-sun::vec3 ParseNormal       (const FbxMesh* mesh, int controlPointIndex, int vertexCount);
-sun::vec3 ParseBinormal     (const FbxMesh* mesh, int controlPointIndex, int vertexCount);
-sun::vec3 ParseTangent      (      FbxMesh* mesh, int controlPointIndex, int vertexCount);
-sun::vec2 ParseUV           (const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex);
+vec3 ParseNormal       (const FbxMesh* mesh, int controlPointIndex, int vertexCount);
+vec3 ParseBinormal     (const FbxMesh* mesh, int controlPointIndex, int vertexCount);
+vec3 ParseTangent      (      FbxMesh* mesh, int controlPointIndex, int vertexCount);
+vec2 ParseUV           (const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex);
 
-void InsertVertex(const sun::vec3& position, const sun::vec3& normal, const sun::vec2& uv, const sun::vec3& binormal, const sun::vec3& tangent);
+void      ParseAnimation    (      FbxNode* node);
+
+//void InsertVertex(const vec3& position, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent);
+void InsertVertex(const uint rawPositionIndex , const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent);
 
 int main()
 {
@@ -70,9 +89,28 @@ int main()
 		FbxGeometryConverter geometryConverter(manager);
 		geometryConverter.Triangulate(scene, true);
 
-		LoadNode(scene->GetRootNode());
+		FbxAnimStack* animStack = scene->GetSrcObject<FbxAnimStack>(0);
+
+		if (animStack)
+		{
+			FbxString animStackName = animStack->GetName();
+			FbxTakeInfo* takeInfo = scene->GetTakeInfo(animStackName);
+
+			s_AnimationStart = takeInfo->mLocalTimeSpan.GetStart();
+			s_AnimationEnd   = takeInfo->mLocalTimeSpan.GetStop();
+			s_AnimationLength = s_AnimationEnd.GetFrameCount(FbxTime::eFrames24) - s_AnimationStart.GetFrameCount(FbxTime::eFrames24) + 1;
+		}
+
+		LoadJoint(scene->GetRootNode(), -1, -1, -1);
+
+		s_hasAnimation = s_skeleton.size() > 0 ? true : false;
+
+		LoadNode (scene->GetRootNode());
+
+		sun::SUNWriter writer(s_name, s_vertices, s_indices, s_skeleton, s_AnimationLength);
+		writer.Write(s_outputName);
 	}
-	
+
 	cout << "■■■■■■■■■■■■■■■■■■■" << endl;
 	cout << "Complete Convert " << s_inputName << " To " << s_outputName << endl;
 	cout << "■■■■■■■■■■■■■■■■■■■";
@@ -83,21 +121,43 @@ int main()
 	return 1;
 }
 
+void LoadJoint(FbxNode* node, int depth, int index, int parentIndex)
+{
 
+	FbxNodeAttribute* nodeAttribute = node->GetNodeAttribute();
 
+	if (nodeAttribute && nodeAttribute->GetAttributeType() == FbxNodeAttribute::eSkeleton)
+	{
+		sun::Joint joint;
+		joint.parentIndex = parentIndex;
+		joint.name = node->GetName();
 
+		s_skeleton.push_back(joint);
+	}
+
+	const uint childCount = node->GetChildCount();
+
+	// 재귀
+	for (uint i = 0; i < childCount; ++i)
+		LoadJoint(node->GetChild(i), depth + 1, s_skeleton.size(), index);
+}
 
 
 void LoadNode(FbxNode* node)
 {
 	FbxNodeAttribute* nodeAttribute = node->GetNodeAttribute();
-	cout << "Node" << endl;
 
 	if (nodeAttribute && nodeAttribute->GetAttributeType() == FbxNodeAttribute::eMesh)
 	{
+		std::cout << "Mesh" << std::endl;
 		FbxMesh* mesh = node->GetMesh();
 
-		ParseSave(mesh);
+		ParseControlPoints(mesh);
+		
+		if (s_hasAnimation)
+			ParseAnimation(node);
+
+		ParseMesh(mesh);
 	}
 
 	const uint childCount = node->GetChildCount();
@@ -107,7 +167,7 @@ void LoadNode(FbxNode* node)
 		LoadNode(node->GetChild(i));
 }
 
-bool ParseSave(FbxMesh* mesh)
+bool ParseMesh(FbxMesh* mesh)
 {
 	if (!mesh->GetNode())
 		return false;
@@ -116,64 +176,61 @@ bool ParseSave(FbxMesh* mesh)
 
 	uint vertexCount = 0;
 
-	ParseControlPoints(mesh);
-
 	for (int triangle = 0; triangle < triangleCount; ++triangle)
 	{
-		sun::vec3 tanget;
-		sun::vec3 binormal;
-		sun::vec2 uv;
+		vec3 tanget;
+		vec3 binormal;
+		vec2 uv;
 
 
 		for (uint i = 0; i < 3; ++i)
 		{
 			int controlPointIndex = mesh->GetPolygonVertex(triangle, i);
 
-			sun::vec3& position = s_rawPositions[controlPointIndex];
-			sun::vec3    normal = ParseNormal  (mesh, controlPointIndex, vertexCount);
-			sun::vec3  binormal = ParseBinormal(mesh, controlPointIndex, vertexCount);
-			sun::vec3   tangent = ParseTangent (mesh, controlPointIndex, vertexCount);
-			sun::vec2        uv = ParseUV      (mesh, controlPointIndex, mesh->GetTextureUVIndex(triangle, i));
+			vec3& position = s_rawPositions[controlPointIndex].pos;
+			vec3    normal = ParseNormal  (mesh, controlPointIndex, vertexCount);
+			vec3  binormal = ParseBinormal(mesh, controlPointIndex, vertexCount);
+			vec3   tangent = ParseTangent (mesh, controlPointIndex, vertexCount);
+			vec2        uv = ParseUV      (mesh, controlPointIndex, mesh->GetTextureUVIndex(triangle, i));
 
 			uv.y = 1.0f - uv.y;
 			//position.z = position.z * -1.0f;
 			//normal.z = normal.z * -1.0f;
 
-			InsertVertex(position, normal, uv, binormal, tangent);
+			InsertVertex(controlPointIndex, normal, uv, binormal, tangent);
 
 			vertexCount++;
 		}
 	}
 
-	sun::SUNWriter writer(s_name, s_vertices, s_indices);
-	writer.Write(s_outputName);
+	
 
 	return true;
 }
 
 void ParseControlPoints(const FbxMesh* mesh)
 {
-	uint count = mesh->GetControlPointsCount();
+	s_rawPositionCount = mesh->GetControlPointsCount();
 
-	s_rawPositions = new sun::vec3[count];
+	s_rawPositions = new sun::Position[s_rawPositionCount];
 
-	for (uint i = 0; i < count; ++i)
+	for (uint i = 0; i < s_rawPositionCount; ++i)
 	{
-		sun::vec3 position;
+		vec3 position;
 		position.x = static_cast<float>(mesh->GetControlPointAt(i).mData[0]);
 		position.y = static_cast<float>(mesh->GetControlPointAt(i).mData[1]);
 		position.z = static_cast<float>(mesh->GetControlPointAt(i).mData[2]);
 
-		s_rawPositions[i] = position;
+		s_rawPositions[i].pos = position;
 	}
 }
 
-sun::vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount)
+vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount)
 {
 	if (mesh->GetElementNormalCount() < 1)
-		return sun::vec3();
+		return vec3();
 
-	sun::vec3 result;
+	vec3 result;
 
 	const FbxGeometryElementNormal* vertexNormal = mesh->GetElementNormal(0);
 
@@ -199,7 +256,7 @@ sun::vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCoun
 		}
 		break;
 		default:
-			return sun::vec3();
+			return vec3();
 		}
 		break;
 
@@ -223,7 +280,7 @@ sun::vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCoun
 		}
 		break;
 		default:
-			return sun::vec3();
+			return vec3();
 		}
 		break;
 	}
@@ -231,12 +288,12 @@ sun::vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCoun
 	return result;
 }
 
-sun::vec3 ParseBinormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount)
+vec3 ParseBinormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount)
 {
 	if (mesh->GetElementBinormalCount() < 1)
-		return sun::vec3();
+		return vec3();
 
-	sun::vec3 result;
+	vec3 result;
 
 	const FbxGeometryElementBinormal* vertexBinormal = mesh->GetElementBinormal(0);
 
@@ -262,7 +319,7 @@ sun::vec3 ParseBinormal(const FbxMesh* mesh, int controlPointIndex, int vertexCo
 		}
 		break;
 		default:
-			return sun::vec3();
+			return vec3();
 		}
 		break;
 
@@ -286,7 +343,7 @@ sun::vec3 ParseBinormal(const FbxMesh* mesh, int controlPointIndex, int vertexCo
 		}
 		break;
 		default:
-			return sun::vec3();
+			return vec3();
 		}
 		break;
 	}
@@ -294,12 +351,12 @@ sun::vec3 ParseBinormal(const FbxMesh* mesh, int controlPointIndex, int vertexCo
 	return result;
 }
 
-sun::vec3 ParseTangent(FbxMesh* mesh, int controlPointIndex, int vertexCount)
+vec3 ParseTangent(FbxMesh* mesh, int controlPointIndex, int vertexCount)
 {
 	if (mesh->GetElementTangentCount() < 1)
-		return sun::vec3();
+		return vec3();
 
-	sun::vec3 result;
+	vec3 result;
 
 	FbxGeometryElementTangent* vertexTangent = mesh->GetElementTangent(0);
 
@@ -325,7 +382,7 @@ sun::vec3 ParseTangent(FbxMesh* mesh, int controlPointIndex, int vertexCount)
 		}
 		break;
 		default:
-			return sun::vec3();
+			return vec3();
 		}
 		break;
 
@@ -349,7 +406,7 @@ sun::vec3 ParseTangent(FbxMesh* mesh, int controlPointIndex, int vertexCount)
 		}
 		break;
 		default:
-			return sun::vec3();
+			return vec3();
 		}
 		break;
 	}
@@ -357,12 +414,12 @@ sun::vec3 ParseTangent(FbxMesh* mesh, int controlPointIndex, int vertexCount)
 	return result;
 }
 
-sun::vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex)
+vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex)
 {
 	if (mesh->GetElementUVCount() < 1)
-		return sun::vec2();
+		return vec2();
 
-	sun::vec2 result;
+	vec2 result;
 
 	const FbxGeometryElementUV* vertexUV = mesh->GetElementUV(0);
 
@@ -386,7 +443,7 @@ sun::vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVInd
 		}
 		break;
 		default:
-			return sun::vec2();
+			return vec2();
 		}
 		break;
 
@@ -401,7 +458,7 @@ sun::vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVInd
 		}
 		break;
 		default:
-			return sun::vec2();
+			return vec2();
 		}
 		break;
 	}
@@ -409,7 +466,7 @@ sun::vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVInd
 	return result;
 }
 
-void InsertVertex(const sun::vec3& position, const sun::vec3& normal, const sun::vec2& uv, const sun::vec3& binormal, const sun::vec3& tangent)
+/*void InsertVertex(const vec3& position, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent)
 {
 	sun::Vertex vertex = { position, normal, uv, binormal, tangent };
 
@@ -426,4 +483,130 @@ void InsertVertex(const sun::vec3& position, const sun::vec3& normal, const sun:
 		s_indices.push_back(index);
 		s_vertices.push_back(vertex);
 	}
+}*/
+
+void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent)
+{
+	sun::VertexWithBlending vertex = { s_rawPositions[rawPositionIndex], normal, uv, binormal, tangent };
+
+	auto lookup = s_indexMapping.find(vertex);
+
+	if (lookup != s_indexMapping.end())
+	{
+		s_indices.push_back(lookup->second);
+	}
+	else
+	{
+		uint index = s_vertices.size();
+		s_indexMapping[vertex] = index;
+		s_indices.push_back(index);
+		s_vertices.push_back(vertex);
+	}
+}
+
+void ParseAnimation(FbxNode* node)
+{
+	FbxMesh* mesh = node->GetMesh();
+
+	const FbxVector4 S = node->GetGeometricScaling    (FbxNode::eSourcePivot);
+	const FbxVector4 T = node->GetGeometricTranslation(FbxNode::eSourcePivot);
+	const FbxVector4 R = node->GetGeometricRotation   (FbxNode::eSourcePivot);
+
+	s_rootMatrix = FbxAMatrix(S, T, R);
+	//s_rootMatrix = FbxAMatrix(S, T, R);
+
+	uint deformerCount = mesh->GetDeformerCount();
+
+	// 보통 1개
+	for (int deformerIndex = 0; deformerIndex < deformerCount; ++deformerIndex)
+	{
+		FbxSkin* skin = reinterpret_cast<FbxSkin*>(mesh->GetDeformer(deformerIndex, FbxDeformer::eSkin));
+
+		if (!skin) continue;
+
+		uint clusterCount = skin->GetClusterCount();
+
+		// 클러스터 안의 link가 joint 역할
+
+		for (uint clusterIndex = 0; clusterIndex < clusterCount; ++clusterIndex)
+		{
+			FbxCluster* cluster = skin->GetCluster(clusterIndex);
+
+			FbxAMatrix transformMatrix;
+			FbxAMatrix transformLinkMatrix;
+			FbxAMatrix globalBindposeInverseMatrix;
+
+			cluster->GetTransformMatrix(transformMatrix);
+			cluster->GetTransformLinkMatrix(transformLinkMatrix);
+			globalBindposeInverseMatrix = transformLinkMatrix.Inverse() * transformMatrix * s_rootMatrix;
+		
+			unsigned int jointIndex;
+
+			String jointName = cluster->GetLink()->GetName();
+
+			for (uint i = 0; i < s_skeleton.size(); ++i)
+				if (s_skeleton[i].name == jointName)
+					jointIndex = i;
+
+			//Todo
+			for (int m = 0; m < 4; ++m)
+				for (int n = 0; n < 4; ++n)
+					s_skeleton[jointIndex].globalBindPositionInverse.elements[m * 1 + 1] = (float)(globalBindposeInverseMatrix.Get(m, n));
+
+			//s_skeleton[jointIndex].globalBindPositionInverse = globalBindposeInverseMatrix;
+			s_skeleton[jointIndex].node = cluster->GetLink();
+
+			uint IndicesCount = cluster->GetControlPointIndicesCount();
+
+			for (uint i = 0; i < IndicesCount; ++i)
+			{
+				sun::BlendingIndexWeightPair blendingIndexWeightPair;
+
+				blendingIndexWeightPair.blendingIndex  = jointIndex;
+				blendingIndexWeightPair.blendingWeight = cluster->GetControlPointWeights()[i];
+
+				s_rawPositions[cluster->GetControlPointIndices()[i]].blendingInfo.push_back(blendingIndexWeightPair);
+			}
+
+			// ㄴ조인트 설정 및 각 포지션별 조인트 인덱스 설정 완료
+
+			// 애니메이션 시작
+			sun::KeyFrame** anim = &s_skeleton[jointIndex].animation;
+
+			for (FbxLongLong i = s_AnimationStart.GetFrameCount(FbxTime::eFrames24); i <= s_AnimationEnd.GetFrameCount(FbxTime::eFrames24); ++i)
+			{
+				FbxTime time;
+				time.SetFrame(i, FbxTime::eFrames24);
+				*anim = new sun::KeyFrame();
+				(*anim)->frameNum = i;
+				FbxAMatrix currentTransformOffset = node->EvaluateGlobalTransform(time) * s_rootMatrix;
+				FbxAMatrix globalTransform = currentTransformOffset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(time);
+				
+				// Todo
+				for (int m = 0; m < 4; ++m)
+					for (int n = 0; n < 4; ++n)
+					(*anim)->globalTransform.elements[m * 1 + n] = (float)(globalTransform.Get(m, n));
+				//(*anim)->globalTransform = currentTransformOffset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(time);
+				
+				anim = &((*anim)->next);
+			}
+		}
+	}
+
+	// 8개이하 가중치 0처리 (보간을 위해 8개정도..)
+	sun::BlendingIndexWeightPair blendingIndexWeightPair;
+
+	blendingIndexWeightPair.blendingIndex = 0;
+	blendingIndexWeightPair.blendingWeight = 0;
+
+	for (uint rawPositionIndex = 0; rawPositionIndex < s_rawPositionCount; ++rawPositionIndex)
+	{
+		for (uint i = s_rawPositions[rawPositionIndex].blendingInfo.size(); i <= 8; ++i)
+		{
+			if(rawPositionIndex == 0)
+				std::cout << rawPositionIndex << " : " << i << endl;
+			s_rawPositions[rawPositionIndex].blendingInfo.push_back(blendingIndexWeightPair);
+		}
+	}
+
 }

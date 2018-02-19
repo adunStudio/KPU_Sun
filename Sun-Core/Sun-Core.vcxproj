@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -159,11 +159,22 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="maths\mat4.cpp" />
+    <ClCompile Include="maths\vec2.cpp" />
+    <ClCompile Include="maths\vec3.cpp" />
+    <ClCompile Include="maths\vec4.cpp" />
     <ClCompile Include="SUNMain.cpp" />
     <ClCompile Include="SunWriter.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="SUNMaths.h" />
+    <ClInclude Include="maths\mat4.h" />
+    <ClInclude Include="maths\maths.h" />
+    <ClInclude Include="maths\maths_func.h" />
+    <ClInclude Include="maths\vec2.h" />
+    <ClInclude Include="maths\vec3.h" />
+    <ClInclude Include="maths\vec4.h" />
+    <ClInclude Include="SUN.h" />
+    <ClInclude Include="SunUtilities.h" />
     <ClInclude Include="SUNWriter.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
