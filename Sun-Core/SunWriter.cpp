@@ -6,47 +6,28 @@ namespace sun
 	: m_name(name), m_vertexWithBlending(vertexWithBlending), m_indexBuffer(indices), m_skeleton(skeleton), m_animationLength((byte)animationLength)
 	{
 		m_vertexBuffer.resize(animationLength);
-		
-		for (uint i = 0; i < m_animationLength; ++i)
-		{
-			for (uint j = 0; j < m_skeleton.size(); ++j)
-			{
-
-			}
-		}
 
 		for (uint i = 0; i < m_animationLength; ++i)
 		{
 			for (uint j = 0; j < m_vertexWithBlending.size(); ++j)
 			{
 				vec3 position = m_vertexWithBlending[j].position.pos;
-
+				
 				float weight1 = m_vertexWithBlending[j].position.blendingInfo[0].blendingWeight;
 				float weight2 = m_vertexWithBlending[j].position.blendingInfo[1].blendingWeight;
 				float weight3 = m_vertexWithBlending[j].position.blendingInfo[2].blendingWeight;
 				float weight4 = m_vertexWithBlending[j].position.blendingInfo[3].blendingWeight;
-				float weight5 = m_vertexWithBlending[j].position.blendingInfo[4].blendingWeight;
-				float weight6 = m_vertexWithBlending[j].position.blendingInfo[5].blendingWeight;
-				float weight7 = m_vertexWithBlending[j].position.blendingInfo[6].blendingWeight;
-				float weight8 = m_vertexWithBlending[j].position.blendingInfo[7].blendingWeight;
 				
 				uint index1 = m_vertexWithBlending[j].position.blendingInfo[0].blendingIndex;
 				uint index2 = m_vertexWithBlending[j].position.blendingInfo[1].blendingIndex;
 				uint index3 = m_vertexWithBlending[j].position.blendingInfo[2].blendingIndex;
 				uint index4 = m_vertexWithBlending[j].position.blendingInfo[3].blendingIndex;
-				uint index5 = m_vertexWithBlending[j].position.blendingInfo[4].blendingIndex;
-				uint index6 = m_vertexWithBlending[j].position.blendingInfo[5].blendingIndex;
-				uint index7 = m_vertexWithBlending[j].position.blendingInfo[6].blendingIndex;
-				uint index8 = m_vertexWithBlending[j].position.blendingInfo[7].blendingIndex;
-			
+				
 				KeyFrame* anim1 = m_skeleton[index1].animation;
 				KeyFrame* anim2 = m_skeleton[index2].animation;
 				KeyFrame* anim3 = m_skeleton[index3].animation;
 				KeyFrame* anim4 = m_skeleton[index4].animation;
-				KeyFrame* anim5 = m_skeleton[index5].animation;
-				KeyFrame* anim6 = m_skeleton[index6].animation;
-				KeyFrame* anim7 = m_skeleton[index7].animation;
-				KeyFrame* anim8 = m_skeleton[index8].animation;
+				
 
 				for (int time = 0; time < i; ++time)
 				{
@@ -54,38 +35,43 @@ namespace sun
 					anim2 = anim2->next;
 					anim3 = anim3->next;
 					anim4 = anim4->next;
-					anim4 = anim5->next;
-					anim4 = anim6->next;
-					anim4 = anim7->next;
-					anim4 = anim8->next;
 				}
 				
+				FbxMatrix a1 = m_skeleton[index1].globalBindPositionInverse * anim1->globalTransform;
+				FbxMatrix a2 = m_skeleton[index2].globalBindPositionInverse * anim2->globalTransform;
+				FbxMatrix a3 = m_skeleton[index3].globalBindPositionInverse * anim3->globalTransform;
+				FbxMatrix a4 = m_skeleton[index4].globalBindPositionInverse * anim4->globalTransform;
 
-				{
-					if (weight1 > 0.0f)
-						position = position + (vec3(weight1) * (position.Multiply(m_skeleton[index1].globalBindPositionInverse)).Multiply(anim1->globalTransform));
-					if (weight2 > 0.0f)
-						position = position + (vec3(weight2) * (position.Multiply(m_skeleton[index2].globalBindPositionInverse)).Multiply(anim2->globalTransform));
-					if (weight3 > 0.0f)
-						position = position + (vec3(weight3) * (position.Multiply(m_skeleton[index3].globalBindPositionInverse)).Multiply(anim3->globalTransform));
-					if (weight4 > 0.0f)
-						position = position + (vec3(weight4) * (position.Multiply(m_skeleton[index4].globalBindPositionInverse)).Multiply(anim4->globalTransform));
-					if (weight5 > 0.0f)
-						position = position + (vec3(weight5) * (position.Multiply(m_skeleton[index5].globalBindPositionInverse)).Multiply(anim5->globalTransform));
-					if (weight6 > 0.0f)
-						position = position + (vec3(weight6) * (position.Multiply(m_skeleton[index6].globalBindPositionInverse)).Multiply(anim6->globalTransform));
-					if (weight7 > 0.0f)
-						position = position + (vec3(weight7) * (position.Multiply(m_skeleton[index7].globalBindPositionInverse)).Multiply(anim7->globalTransform));
-					if (weight8 > 0.0f)
-						position = position + (vec3(weight8) * (position.Multiply(m_skeleton[index8].globalBindPositionInverse)).Multiply(anim8->globalTransform));
-				}
+				mat4 m1;
+				mat4 m2;
+				mat4 m3;
+				mat4 m4;
 
+				for (int mi = 0; mi < 4; ++mi)
+					for (int mj = 0; mj < 4; ++mj)
+						m1.elements[mi * 4 + mj] = a1.Get(mi, mj);
 
-				//position = position.Multiply();
-			
+				for (int mi = 0; mi < 4; ++mi)
+					for (int mj = 0; mj < 4; ++mj)
+						m2.elements[mi * 4 + mj] = a2.Get(mi, mj);
 
-				//position = position + (vec3(weight1) * (position.Multiply(m_skeleton[index1].globalBindPositionInverse)).Multiply(anim->globalTransform));
+				for (int mi = 0; mi < 4; ++mi)
+					for (int mj = 0; mj < 4; ++mj)
+						m3.elements[mi * 4 + mj] = a3.Get(mi, mj);
 
+				for (int mi = 0; mi < 4; ++mi)
+					for (int mj = 0; mj < 4; ++mj)
+						m4.elements[mi * 4 + mj] = a4.Get(mi, mj);
+
+				if (weight1 > 0.0f)
+					position = position + (vec3(weight1) * position.Multiply(m1));
+				if (weight2 > 0.0f)
+					position = position + (vec3(weight2) * position.Multiply(m2));
+				if (weight3 > 0.0f)
+					position = position + (vec3(weight3) * position.Multiply(m3));
+				if (weight4 > 0.0f)
+					position = position + (vec3(weight4) * position.Multiply(m4));
+				
 
 				Vertex v = { position, m_vertexWithBlending[j].normal, m_vertexWithBlending[j].uv, m_vertexWithBlending[j].binormal, m_vertexWithBlending[j].tangent };
 				

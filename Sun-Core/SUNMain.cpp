@@ -195,7 +195,7 @@ bool ParseMesh(FbxMesh* mesh)
 
 			uv.y = 1.0f - uv.y;
 			//position.z = position.z * -1.0f;
-			//normal.z = normal.z * -1.0f;
+			normal.z = normal.z * -1.0f;
 
 			InsertVertex(controlPointIndex, normal, uv, binormal, tangent);
 
@@ -512,7 +512,7 @@ void ParseAnimation(FbxNode* node)
 	const FbxVector4 T = node->GetGeometricTranslation(FbxNode::eSourcePivot);
 	const FbxVector4 R = node->GetGeometricRotation   (FbxNode::eSourcePivot);
 
-	s_rootMatrix = FbxAMatrix(S, T, R);
+	s_rootMatrix = FbxAMatrix(T, R, S);
 	//s_rootMatrix = FbxAMatrix(S, T, R);
 
 	uint deformerCount = mesh->GetDeformerCount();
@@ -548,12 +548,7 @@ void ParseAnimation(FbxNode* node)
 				if (s_skeleton[i].name == jointName)
 					jointIndex = i;
 
-			//Todo
-			for (int m = 0; m < 4; ++m)
-				for (int n = 0; n < 4; ++n)
-					s_skeleton[jointIndex].globalBindPositionInverse.elements[m * 1 + 1] = (float)(globalBindposeInverseMatrix.Get(m, n));
-
-			//s_skeleton[jointIndex].globalBindPositionInverse = globalBindposeInverseMatrix;
+			s_skeleton[jointIndex].globalBindPositionInverse = globalBindposeInverseMatrix;
 			s_skeleton[jointIndex].node = cluster->GetLink();
 
 			uint IndicesCount = cluster->GetControlPointIndicesCount();
@@ -582,18 +577,14 @@ void ParseAnimation(FbxNode* node)
 				FbxAMatrix currentTransformOffset = node->EvaluateGlobalTransform(time) * s_rootMatrix;
 				FbxAMatrix globalTransform = currentTransformOffset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(time);
 				
-				// Todo
-				for (int m = 0; m < 4; ++m)
-					for (int n = 0; n < 4; ++n)
-					(*anim)->globalTransform.elements[m * 1 + n] = (float)(globalTransform.Get(m, n));
-				//(*anim)->globalTransform = currentTransformOffset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(time);
+				(*anim)->globalTransform = currentTransformOffset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(time);
 				
 				anim = &((*anim)->next);
 			}
 		}
 	}
 
-	// 8개이하 가중치 0처리 (보간을 위해 8개정도..)
+	// 4개이하 가중치 0처리
 	sun::BlendingIndexWeightPair blendingIndexWeightPair;
 
 	blendingIndexWeightPair.blendingIndex = 0;
@@ -601,7 +592,7 @@ void ParseAnimation(FbxNode* node)
 
 	for (uint rawPositionIndex = 0; rawPositionIndex < s_rawPositionCount; ++rawPositionIndex)
 	{
-		for (uint i = s_rawPositions[rawPositionIndex].blendingInfo.size(); i <= 8; ++i)
+		for (uint i = s_rawPositions[rawPositionIndex].blendingInfo.size(); i <= 4; ++i)
 		{
 			if(rawPositionIndex == 0)
 				std::cout << rawPositionIndex << " : " << i << endl;

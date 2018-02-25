@@ -22,8 +22,7 @@ namespace sun
 	{
 		FbxLongLong frameNum;
 
-		mat4 globalTransform;
-		//FbxMatrix globalTransform;
+		FbxMatrix globalTransform;
 
 		KeyFrame* next;
 
@@ -36,8 +35,7 @@ namespace sun
 
 		int parentIndex;
 
-		mat4 globalBindPositionInverse;
-		//FbxMatrix globalBindPositionInverse;
+		FbxMatrix globalBindPositionInverse;
 
 		KeyFrame* animation;
 
@@ -45,7 +43,7 @@ namespace sun
 
 		Joint() : animation(nullptr), node(nullptr), parentIndex(-1)
 		{
-			globalBindPositionInverse = mat4::Identity();
+			globalBindPositionInverse.SetIdentity();
 		}
 
 		~Joint()
