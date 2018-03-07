@@ -176,6 +176,7 @@
     <ClInclude Include="SUN.h" />
     <ClInclude Include="SunUtilities.h" />
     <ClInclude Include="SUNWriter.h" />
+    <ClInclude Include="Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

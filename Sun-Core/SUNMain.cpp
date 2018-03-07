@@ -83,7 +83,12 @@ int main()
 	if (importer->Import(scene))
 	{
 		// 씬 내의 좌표축을 바꾼다.
-		FbxAxisSystem::MayaYUp.ConvertScene(scene);
+		FbxAxisSystem sceneAxisSystem = scene->GetGlobalSettings().GetAxisSystem();
+		FbxAxisSystem ourAxisSystem(FbxAxisSystem::eOpenGL);
+		if (sceneAxisSystem != ourAxisSystem)
+			ourAxisSystem.ConvertScene(scene);
+
+		/*FbxAxisSystem::MayaYUp.ConvertScene(scene);*/
 
 		// 씬 내에서 삼각형화 할 수 있는 모든 노드를 삼각형화 시킨다.
 		FbxGeometryConverter geometryConverter(manager);
@@ -508,12 +513,13 @@ void ParseAnimation(FbxNode* node)
 {
 	FbxMesh* mesh = node->GetMesh();
 
-	const FbxVector4 S = node->GetGeometricScaling    (FbxNode::eSourcePivot);
+	s_rootMatrix.SetIdentity();
+
 	const FbxVector4 T = node->GetGeometricTranslation(FbxNode::eSourcePivot);
 	const FbxVector4 R = node->GetGeometricRotation   (FbxNode::eSourcePivot);
+	const FbxVector4 S = node->GetGeometricScaling    (FbxNode::eSourcePivot);
 
 	s_rootMatrix = FbxAMatrix(T, R, S);
-	//s_rootMatrix = FbxAMatrix(S, T, R);
 
 	uint deformerCount = mesh->GetDeformerCount();
 
@@ -538,6 +544,7 @@ void ParseAnimation(FbxNode* node)
 
 			cluster->GetTransformMatrix(transformMatrix);
 			cluster->GetTransformLinkMatrix(transformLinkMatrix);
+			
 			globalBindposeInverseMatrix = transformLinkMatrix.Inverse() * transformMatrix * s_rootMatrix;
 		
 			unsigned int jointIndex;
@@ -574,10 +581,11 @@ void ParseAnimation(FbxNode* node)
 				time.SetFrame(i, FbxTime::eFrames24);
 				*anim = new sun::KeyFrame();
 				(*anim)->frameNum = i;
+
 				FbxAMatrix currentTransformOffset = node->EvaluateGlobalTransform(time) * s_rootMatrix;
 				FbxAMatrix globalTransform = currentTransformOffset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(time);
 				
-				(*anim)->globalTransform = currentTransformOffset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(time);
+				(*anim)->globalTransform = globalTransform;
 				
 				anim = &((*anim)->next);
 			}
@@ -594,8 +602,6 @@ void ParseAnimation(FbxNode* node)
 	{
 		for (uint i = s_rawPositions[rawPositionIndex].blendingInfo.size(); i <= 4; ++i)
 		{
-			if(rawPositionIndex == 0)
-				std::cout << rawPositionIndex << " : " << i << endl;
 			s_rawPositions[rawPositionIndex].blendingInfo.push_back(blendingIndexWeightPair);
 		}
 	}

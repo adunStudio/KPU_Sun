@@ -12,7 +12,7 @@ namespace sun
 			for (uint j = 0; j < m_vertexWithBlending.size(); ++j)
 			{
 				vec3 position = m_vertexWithBlending[j].position.pos;
-				
+
 				float weight1 = m_vertexWithBlending[j].position.blendingInfo[0].blendingWeight;
 				float weight2 = m_vertexWithBlending[j].position.blendingInfo[1].blendingWeight;
 				float weight3 = m_vertexWithBlending[j].position.blendingInfo[2].blendingWeight;
@@ -37,43 +37,32 @@ namespace sun
 					anim4 = anim4->next;
 				}
 				
-				FbxMatrix a1 = m_skeleton[index1].globalBindPositionInverse * anim1->globalTransform;
-				FbxMatrix a2 = m_skeleton[index2].globalBindPositionInverse * anim2->globalTransform;
-				FbxMatrix a3 = m_skeleton[index3].globalBindPositionInverse * anim3->globalTransform;
-				FbxMatrix a4 = m_skeleton[index4].globalBindPositionInverse * anim4->globalTransform;
+				FbxAMatrix a1 = anim1->globalTransform *  m_skeleton[index1].globalBindPositionInverse;
+				FbxAMatrix a2 = anim2->globalTransform *  m_skeleton[index2].globalBindPositionInverse;
+				FbxAMatrix a3 = anim3->globalTransform *  m_skeleton[index3].globalBindPositionInverse;
+				FbxAMatrix a4 = anim4->globalTransform *  m_skeleton[index4].globalBindPositionInverse;
+			
 
-				mat4 m1;
-				mat4 m2;
-				mat4 m3;
-				mat4 m4;
-
-				for (int mi = 0; mi < 4; ++mi)
-					for (int mj = 0; mj < 4; ++mj)
-						m1.elements[mi * 4 + mj] = a1.Get(mi, mj);
-
-				for (int mi = 0; mi < 4; ++mi)
-					for (int mj = 0; mj < 4; ++mj)
-						m2.elements[mi * 4 + mj] = a2.Get(mi, mj);
-
-				for (int mi = 0; mi < 4; ++mi)
-					for (int mj = 0; mj < 4; ++mj)
-						m3.elements[mi * 4 + mj] = a3.Get(mi, mj);
-
-				for (int mi = 0; mi < 4; ++mi)
-					for (int mj = 0; mj < 4; ++mj)
-						m4.elements[mi * 4 + mj] = a4.Get(mi, mj);
-
+				FbxVector4 pos = { position.x, position.y, position.z, 1 };
+				FbxVector4 tmp = { position.x, position.y, position.z, 1 };
+				
+		
+				
 				if (weight1 > 0.0f)
-					position = position + (vec3(weight1) * position.Multiply(m1));
+					pos += a1.MultT(tmp) * weight1;
+				
 				if (weight2 > 0.0f)
-					position = position + (vec3(weight2) * position.Multiply(m2));
+					pos += a2.MultT(tmp) * weight2;
+				
 				if (weight3 > 0.0f)
-					position = position + (vec3(weight3) * position.Multiply(m3));
+					pos += a3.MultT(tmp) * weight3;
+				
 				if (weight4 > 0.0f)
-					position = position + (vec3(weight4) * position.Multiply(m4));
+					pos += a4.MultT(tmp) * weight4;
 				
 
-				Vertex v = { position, m_vertexWithBlending[j].normal, m_vertexWithBlending[j].uv, m_vertexWithBlending[j].binormal, m_vertexWithBlending[j].tangent };
+				vec3 result = { (float)pos[0], (float)pos[1], (float)pos[2] };
+				Vertex v = { result, m_vertexWithBlending[j].normal, m_vertexWithBlending[j].uv, m_vertexWithBlending[j].binormal, m_vertexWithBlending[j].tangent };
 				
 				m_vertexBuffer[i].push_back(v);
 			}

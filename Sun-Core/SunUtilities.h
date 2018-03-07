@@ -22,7 +22,7 @@ namespace sun
 	{
 		FbxLongLong frameNum;
 
-		FbxMatrix globalTransform;
+		FbxAMatrix globalTransform;
 
 		KeyFrame* next;
 
@@ -35,7 +35,7 @@ namespace sun
 
 		int parentIndex;
 
-		FbxMatrix globalBindPositionInverse;
+		FbxAMatrix globalBindPositionInverse;
 
 		KeyFrame* animation;
 
