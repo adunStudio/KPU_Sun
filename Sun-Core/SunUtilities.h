@@ -65,7 +65,7 @@ namespace sun
 		uint blendingIndex;
 		float blendingWeight;
 
-		BlendingIndexWeightPair() : blendingIndex(0), blendingWeight(0)
+		BlendingIndexWeightPair() : blendingIndex(0), blendingWeight(0.f)
 		{}
 	};
 

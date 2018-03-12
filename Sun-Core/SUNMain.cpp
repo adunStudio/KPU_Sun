@@ -30,22 +30,23 @@ static bool s_hasAnimation;
 
 static FbxTime s_AnimationStart, s_AnimationEnd;           // 애니메이션 시작과 종료 시간
 static size_t s_AnimationLength = 1;                  // 애니메이션 길이(종료 - 시작)
+static FbxAnimStack* s_animStack;
 
 void LoadJoint(FbxNode* node, int depth, int index, int parentIndex);
 void LoadNode(FbxNode* node);
 
 
-bool      ParseMesh         (      FbxMesh* mesh);
+bool      ParseMesh(FbxMesh* mesh);
 void      ParseControlPoints(const FbxMesh* mesh);
-vec3 ParseNormal       (const FbxMesh* mesh, int controlPointIndex, int vertexCount);
-vec3 ParseBinormal     (const FbxMesh* mesh, int controlPointIndex, int vertexCount);
-vec3 ParseTangent      (      FbxMesh* mesh, int controlPointIndex, int vertexCount);
-vec2 ParseUV           (const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex);
+vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount);
+vec3 ParseBinormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount);
+vec3 ParseTangent(FbxMesh* mesh, int controlPointIndex, int vertexCount);
+vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex);
 
-void      ParseAnimation    (      FbxNode* node);
+void      ParseAnimation(FbxNode* node);
 
 //void InsertVertex(const vec3& position, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent);
-void InsertVertex(const uint rawPositionIndex , const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent);
+void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent);
 
 int main()
 {
@@ -53,11 +54,11 @@ int main()
 
 	cin >> s_name;
 
-	s_inputName  = s_name + ".fbx";
-	s_outputName = s_name + ".sun";
+	s_inputName = s_name + ".fbx";
+	s_outputName = "C:/Users/adunstudio/Desktop/Sunny/Sunny-Core/resource/suns/" + s_name + ".sun";
 
-	FbxManager*  manager  = FbxManager:: Create();
-	FbxScene*      scene  = FbxScene::   Create(manager, "scene");
+	FbxManager*  manager = FbxManager::Create();
+	FbxScene*      scene = FbxScene::Create(manager, "scene");
 	FbxImporter* importer = FbxImporter::Create(manager, "");
 
 	int format = -1;
@@ -79,7 +80,7 @@ int main()
 		getchar();
 		exit(1);
 	}
-	
+
 	if (importer->Import(scene))
 	{
 		// 씬 내의 좌표축을 바꾼다.
@@ -94,15 +95,16 @@ int main()
 		FbxGeometryConverter geometryConverter(manager);
 		geometryConverter.Triangulate(scene, true);
 
-		FbxAnimStack* animStack = scene->GetSrcObject<FbxAnimStack>(0);
+		s_animStack = scene->GetSrcObject<FbxAnimStack>();
 
-		if (animStack)
+		if (s_animStack)
 		{
-			FbxString animStackName = animStack->GetName();
+			FbxString animStackName = s_animStack->GetName();
 			FbxTakeInfo* takeInfo = scene->GetTakeInfo(animStackName);
 
 			s_AnimationStart = takeInfo->mLocalTimeSpan.GetStart();
-			s_AnimationEnd   = takeInfo->mLocalTimeSpan.GetStop();
+			s_AnimationEnd = takeInfo->mLocalTimeSpan.GetStop();
+
 			s_AnimationLength = s_AnimationEnd.GetFrameCount(FbxTime::eFrames24) - s_AnimationStart.GetFrameCount(FbxTime::eFrames24) + 1;
 		}
 
@@ -110,7 +112,7 @@ int main()
 
 		s_hasAnimation = s_skeleton.size() > 0 ? true : false;
 
-		LoadNode (scene->GetRootNode());
+		LoadNode(scene->GetRootNode());
 
 		sun::SUNWriter writer(s_name, s_vertices, s_indices, s_skeleton, s_AnimationLength);
 		writer.Write(s_outputName);
@@ -158,7 +160,7 @@ void LoadNode(FbxNode* node)
 		FbxMesh* mesh = node->GetMesh();
 
 		ParseControlPoints(mesh);
-		
+
 		if (s_hasAnimation)
 			ParseAnimation(node);
 
@@ -193,10 +195,10 @@ bool ParseMesh(FbxMesh* mesh)
 			int controlPointIndex = mesh->GetPolygonVertex(triangle, i);
 
 			vec3& position = s_rawPositions[controlPointIndex].pos;
-			vec3    normal = ParseNormal  (mesh, controlPointIndex, vertexCount);
+			vec3    normal = ParseNormal(mesh, controlPointIndex, vertexCount);
 			vec3  binormal = ParseBinormal(mesh, controlPointIndex, vertexCount);
-			vec3   tangent = ParseTangent (mesh, controlPointIndex, vertexCount);
-			vec2        uv = ParseUV      (mesh, controlPointIndex, mesh->GetTextureUVIndex(triangle, i));
+			vec3   tangent = ParseTangent(mesh, controlPointIndex, vertexCount);
+			vec2        uv = ParseUV(mesh, controlPointIndex, mesh->GetTextureUVIndex(triangle, i));
 
 			uv.y = 1.0f - uv.y;
 			//position.z = position.z * -1.0f;
@@ -208,7 +210,7 @@ bool ParseMesh(FbxMesh* mesh)
 		}
 	}
 
-	
+
 
 	return true;
 }
@@ -473,21 +475,19 @@ vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex)
 
 /*void InsertVertex(const vec3& position, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent)
 {
-	sun::Vertex vertex = { position, normal, uv, binormal, tangent };
-
-	auto lookup = s_indexMapping.find(vertex);
-
-	if (lookup != s_indexMapping.end())
-	{
-		s_indices.push_back(lookup->second);
-	}
-	else
-	{
-		uint index = s_vertices.size();
-		s_indexMapping[vertex] = index;
-		s_indices.push_back(index);
-		s_vertices.push_back(vertex);
-	}
+sun::Vertex vertex = { position, normal, uv, binormal, tangent };
+auto lookup = s_indexMapping.find(vertex);
+if (lookup != s_indexMapping.end())
+{
+s_indices.push_back(lookup->second);
+}
+else
+{
+uint index = s_vertices.size();
+s_indexMapping[vertex] = index;
+s_indices.push_back(index);
+s_vertices.push_back(vertex);
+}
 }*/
 
 void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent)
@@ -511,22 +511,23 @@ void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& u
 
 void ParseAnimation(FbxNode* node)
 {
-	FbxMesh* mesh = node->GetMesh();
+	FbxGeometry* geo = node->GetGeometry();
 
 	s_rootMatrix.SetIdentity();
 
 	const FbxVector4 T = node->GetGeometricTranslation(FbxNode::eSourcePivot);
-	const FbxVector4 R = node->GetGeometricRotation   (FbxNode::eSourcePivot);
-	const FbxVector4 S = node->GetGeometricScaling    (FbxNode::eSourcePivot);
+	const FbxVector4 R = node->GetGeometricRotation(FbxNode::eSourcePivot);
+	const FbxVector4 S = node->GetGeometricScaling(FbxNode::eSourcePivot);
 
 	s_rootMatrix = FbxAMatrix(T, R, S);
 
-	uint deformerCount = mesh->GetDeformerCount();
+	uint deformerCount = geo->GetDeformerCount();
+
 
 	// 보통 1개
 	for (int deformerIndex = 0; deformerIndex < deformerCount; ++deformerIndex)
 	{
-		FbxSkin* skin = reinterpret_cast<FbxSkin*>(mesh->GetDeformer(deformerIndex, FbxDeformer::eSkin));
+		FbxSkin* skin = reinterpret_cast<FbxSkin*>(geo->GetDeformer(deformerIndex, FbxDeformer::eSkin));
 
 		if (!skin) continue;
 
@@ -544,9 +545,9 @@ void ParseAnimation(FbxNode* node)
 
 			cluster->GetTransformMatrix(transformMatrix);
 			cluster->GetTransformLinkMatrix(transformLinkMatrix);
-			
+
+
 			globalBindposeInverseMatrix = transformLinkMatrix.Inverse() * transformMatrix * s_rootMatrix;
-		
 			unsigned int jointIndex;
 
 			String jointName = cluster->GetLink()->GetName();
@@ -554,6 +555,7 @@ void ParseAnimation(FbxNode* node)
 			for (uint i = 0; i < s_skeleton.size(); ++i)
 				if (s_skeleton[i].name == jointName)
 					jointIndex = i;
+
 
 			s_skeleton[jointIndex].globalBindPositionInverse = globalBindposeInverseMatrix;
 			s_skeleton[jointIndex].node = cluster->GetLink();
@@ -564,9 +566,8 @@ void ParseAnimation(FbxNode* node)
 			{
 				sun::BlendingIndexWeightPair blendingIndexWeightPair;
 
-				blendingIndexWeightPair.blendingIndex  = jointIndex;
-				blendingIndexWeightPair.blendingWeight = cluster->GetControlPointWeights()[i];
-
+				blendingIndexWeightPair.blendingIndex = jointIndex;
+				blendingIndexWeightPair.blendingWeight = (float)(cluster->GetControlPointWeights()[i]);
 				s_rawPositions[cluster->GetControlPointIndices()[i]].blendingInfo.push_back(blendingIndexWeightPair);
 			}
 
@@ -582,11 +583,17 @@ void ParseAnimation(FbxNode* node)
 				*anim = new sun::KeyFrame();
 				(*anim)->frameNum = i;
 
-				FbxAMatrix currentTransformOffset = node->EvaluateGlobalTransform(time) * s_rootMatrix;
+				const FbxVector4 Tr = cluster->GetLink()->GetGeometricTranslation(FbxNode::eSourcePivot);
+				const FbxVector4 Rr = cluster->GetLink()->GetGeometricRotation(FbxNode::eSourcePivot);
+				const FbxVector4 Sr = cluster->GetLink()->GetGeometricScaling(FbxNode::eSourcePivot);
+
+				//s_rootMatrix = ;
+
+				FbxAMatrix currentTransformOffset = node->EvaluateGlobalTransform(time) *FbxAMatrix(Tr, Rr, Sr);
 				FbxAMatrix globalTransform = currentTransformOffset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(time);
-				
+
 				(*anim)->globalTransform = globalTransform;
-				
+
 				anim = &((*anim)->next);
 			}
 		}

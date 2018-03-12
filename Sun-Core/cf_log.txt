@@ -1,0 +1,1 @@
+Error: FBX error 0: Corrupted or invalid file.  (file: 'C:\Users\adunstudio\Desktop\KPU_Sun\Sun-Core\bear_walk.fbx') [ (line 0)]
