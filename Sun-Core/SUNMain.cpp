@@ -203,13 +203,13 @@ bool ParseMesh(FbxMesh* mesh)
 			uv.y = 1.0f - uv.y;
 			//position.z = position.z * -1.0f;
 			normal.z = normal.z * -1.0f;
+			normal.y = normal.y * -1.0f;
 
 			InsertVertex(controlPointIndex, normal, uv, binormal, tangent);
 
 			vertexCount++;
 		}
 	}
-
 
 
 	return true;
@@ -523,7 +523,6 @@ void ParseAnimation(FbxNode* node)
 
 	uint deformerCount = geo->GetDeformerCount();
 
-
 	// ∫∏≈Î 1∞≥
 	for (int deformerIndex = 0; deformerIndex < deformerCount; ++deformerIndex)
 	{
@@ -555,7 +554,6 @@ void ParseAnimation(FbxNode* node)
 			for (uint i = 0; i < s_skeleton.size(); ++i)
 				if (s_skeleton[i].name == jointName)
 					jointIndex = i;
-
 
 			s_skeleton[jointIndex].globalBindPositionInverse = globalBindposeInverseMatrix;
 			s_skeleton[jointIndex].node = cluster->GetLink();
