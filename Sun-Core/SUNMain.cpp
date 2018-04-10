@@ -55,7 +55,7 @@ int main()
 	cin >> s_name;
 
 	s_inputName = s_name + ".fbx";
-	s_outputName = "C:/Users/adunstudio/Desktop/Sunny/Sunny-Core/resource/suns/" + s_name + ".sun";
+	s_outputName = "C:/Users/adunstudio/Desktop/Sunny/Sunny-Core/resource/sun/" + s_name + ".sun";
 
 	FbxManager*  manager = FbxManager::Create();
 	FbxScene*      scene = FbxScene::Create(manager, "scene");
@@ -523,6 +523,7 @@ void ParseAnimation(FbxNode* node)
 
 	uint deformerCount = geo->GetDeformerCount();
 
+	std::cout << "deformer: " << deformerCount << std::endl;
 	// º¸Åë 1°³
 	for (int deformerIndex = 0; deformerIndex < deformerCount; ++deformerIndex)
 	{
@@ -550,7 +551,7 @@ void ParseAnimation(FbxNode* node)
 			unsigned int jointIndex;
 
 			String jointName = cluster->GetLink()->GetName();
-
+			std::cout << jointName << std::endl;
 			for (uint i = 0; i < s_skeleton.size(); ++i)
 				if (s_skeleton[i].name == jointName)
 					jointIndex = i;
