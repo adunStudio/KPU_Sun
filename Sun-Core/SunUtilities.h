@@ -87,6 +87,7 @@ namespace sun
 		vec2 uv;
 		vec3 binormal;
 		vec3 tangent;
+		int id;
 
 		bool operator==(const VertexWithBlending& other) const
 		{
@@ -109,6 +110,6 @@ struct std::hash<sun::VertexWithBlending>
 {
 	const size_t operator()(const sun::VertexWithBlending& key) const
 	{
-		return key.position.pos.GetHash() ^ key.normal.GetHash() ^ key.uv.GetHash() ^ key.binormal.GetHash() ^ key.tangent.GetHash();
+		return key.position.pos.GetHash() ^ key.normal.GetHash() ^ key.uv.GetHash() ^ key.binormal.GetHash() ^ key.tangent.GetHash() ^ key.id;
 	}
 };

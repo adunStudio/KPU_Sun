@@ -12,12 +12,14 @@ using namespace std;
 using namespace sunny;
 using namespace maths;
 
+static int s_id = 0;
+
 static vector<sun::VertexWithBlending>                  s_vertices;     // 정점
 static vector<uint>                                     s_indices;      // 인덱스
 static unordered_map<sun::VertexWithBlending, uint>    s_indexMapping;  // 정점+인덱스 맵핑
 
 static sun::Position* s_rawPositions;                    // 정점 위치, 애니메이션
-static uint s_rawPositionCount;
+static uint s_rawPositionCount = 0;
 
 static String s_name, s_inputName, s_outputName;
 
@@ -54,8 +56,9 @@ int main()
 
 	cin >> s_name;
 
-	s_inputName = s_name + ".fbx";
-	s_outputName = "C:/Users/adunstudio/Desktop/Sunny/Sunny-Core/resource/sun/" + s_name + ".sun";
+	s_inputName = "Meshes/" + s_name + ".fbx";
+	//s_outputName = "Meshes/" + s_name + ".fbx";
+	s_outputName = "C:/Users/adunstudio/Desktop/Sunny/Sunny-Core/04_ASSET/SUN/" + s_name + ".sun";
 
 	FbxManager*  manager = FbxManager::Create();
 	FbxScene*      scene = FbxScene::Create(manager, "scene");
@@ -152,16 +155,30 @@ void LoadJoint(FbxNode* node, int depth, int index, int parentIndex)
 
 void LoadNode(FbxNode* node)
 {
+
 	FbxNodeAttribute* nodeAttribute = node->GetNodeAttribute();
 
 	if (nodeAttribute && nodeAttribute->GetAttributeType() == FbxNodeAttribute::eMesh)
 	{
 		std::cout << "Mesh" << std::endl;
+
+		int materialCount = node->GetSrcObjectCount<FbxSurfaceMaterial>();
+		if (materialCount > 0)
+			std::cout << "materialCount: " << materialCount << std::endl;
+
+		for (int index = 0; index < materialCount; ++index)
+		{
+			FbxSurfaceMaterial* material = (FbxSurfaceMaterial*)node->GetSrcObject<FbxSurfaceMaterial>(index);
+			if (!material) continue;
+
+			std::cout << "texture: " << material->GetName() << std::endl;
+		}
+
 		FbxMesh* mesh = node->GetMesh();
 
 		ParseControlPoints(mesh);
 
-		if (s_hasAnimation)
+		if (s_hasAnimation )
 			ParseAnimation(node);
 
 		ParseMesh(mesh);
@@ -179,9 +196,16 @@ bool ParseMesh(FbxMesh* mesh)
 	if (!mesh->GetNode())
 		return false;
 
+
+	int materialCount = mesh->GetSrcObjectCount<FbxSurfaceMaterial>();
+
 	uint triangleCount = mesh->GetPolygonCount();
 
 	uint vertexCount = 0;
+
+	s_id++;
+
+	std::cout << "s_id: " << s_id << std::endl;
 
 	for (int triangle = 0; triangle < triangleCount; ++triangle)
 	{
@@ -189,35 +213,60 @@ bool ParseMesh(FbxMesh* mesh)
 		vec3 binormal;
 		vec2 uv;
 
+		int id = 0;
+
+
+		for (int a = 0; a < mesh->GetElementMaterialCount(); a++)
+		{
+
+			FbxGeometryElementMaterial* lMaterialElement = mesh->GetElementMaterial(a);
+			FbxSurfaceMaterial* lMaterial = NULL;
+			int lMatId = -1;
+			lMaterial = mesh->GetNode()->GetMaterial(lMaterialElement->GetIndexArray().GetAt(triangle));
+			id = lMaterialElement->GetIndexArray().GetAt(triangle);
+		}
+
 
 		for (uint i = 0; i < 3; ++i)
 		{
 			int controlPointIndex = mesh->GetPolygonVertex(triangle, i);
-
+			
 			vec3& position = s_rawPositions[controlPointIndex].pos;
 			vec3    normal = ParseNormal(mesh, controlPointIndex, vertexCount);
 			vec3  binormal = ParseBinormal(mesh, controlPointIndex, vertexCount);
-			vec3   tangent = ParseTangent(mesh, controlPointIndex, vertexCount);
+			//vec3   tangent = ParseTangent(mesh, controlPointIndex, vertexCount);
+			vec3   tangent = {1.0f *  id, 1.0f * id, 1.0f * id };// ParseTangent(mesh, controlPointIndex, vertexCount);
 			vec2        uv = ParseUV(mesh, controlPointIndex, mesh->GetTextureUVIndex(triangle, i));
+			
+			
+			FbxGeometryElementMaterial* vertexMaterial =  mesh->GetElementMaterial(0);
+		
 
 			uv.y = 1.0f - uv.y;
-			//position.z = position.z * -1.0f;
-			normal.z = normal.z * -1.0f;
-			normal.y = normal.y * -1.0f;
-
+			//uv.x = 1.0f - uv.x;
+	
+			
 			InsertVertex(controlPointIndex, normal, uv, binormal, tangent);
 
 			vertexCount++;
+			
+			
 		}
 	}
 
+	std::cout << "--------------" << s_vertices.size() << "--------------" << std::endl;
+	std::cout << "--------------" << s_indices.size() << "--------------" << std::endl;
+	
 
 	return true;
 }
 
 void ParseControlPoints(const FbxMesh* mesh)
 {
+	
 	s_rawPositionCount = mesh->GetControlPointsCount();
+
+	std::cout << "s_rawPositionCount: " << s_rawPositionCount << std::endl;
 
 	s_rawPositions = new sun::Position[s_rawPositionCount];
 
@@ -229,6 +278,7 @@ void ParseControlPoints(const FbxMesh* mesh)
 		position.z = static_cast<float>(mesh->GetControlPointAt(i).mData[2]);
 
 		s_rawPositions[i].pos = position;
+		// rawPosition 문제
 	}
 }
 
@@ -256,6 +306,7 @@ vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount)
 
 		case FbxGeometryElement::eIndexToDirect:
 		{
+
 			int index = vertexNormal->GetIndexArray().GetAt(controlPointIndex);
 			result.x = static_cast<float>(vertexNormal->GetDirectArray().GetAt(index).mData[0]);
 			result.y = static_cast<float>(vertexNormal->GetDirectArray().GetAt(index).mData[1]);
@@ -272,6 +323,7 @@ vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount)
 		{
 		case FbxGeometryElement::eDirect:
 		{
+
 			result.x = static_cast<float>(vertexNormal->GetDirectArray().GetAt(vertexCount).mData[0]);
 			result.y = static_cast<float>(vertexNormal->GetDirectArray().GetAt(vertexCount).mData[1]);
 			result.z = static_cast<float>(vertexNormal->GetDirectArray().GetAt(vertexCount).mData[2]);
@@ -280,6 +332,7 @@ vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount)
 
 		case FbxGeometryElement::eIndexToDirect:
 		{
+
 			int index = vertexNormal->GetIndexArray().GetAt(vertexCount);
 			result.x = static_cast<float>(vertexNormal->GetDirectArray().GetAt(index).mData[0]);
 			result.y = static_cast<float>(vertexNormal->GetDirectArray().GetAt(index).mData[1]);
@@ -291,6 +344,9 @@ vec3 ParseNormal(const FbxMesh* mesh, int controlPointIndex, int vertexCount)
 		}
 		break;
 	}
+
+	//result.y *= -1;
+	//result.z *=  -1;
 
 	return result;
 }
@@ -424,7 +480,11 @@ vec3 ParseTangent(FbxMesh* mesh, int controlPointIndex, int vertexCount)
 vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex)
 {
 	if (mesh->GetElementUVCount() < 1)
+	{
+		std::cout << "not uvcount" << std::endl;
 		return vec2();
+
+	}
 
 	vec2 result;
 
@@ -492,7 +552,7 @@ s_vertices.push_back(vertex);
 
 void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent)
 {
-	sun::VertexWithBlending vertex = { s_rawPositions[rawPositionIndex], normal, uv, binormal, tangent };
+	sun::VertexWithBlending vertex = { s_rawPositions[rawPositionIndex], normal, uv, binormal, tangent, s_id };
 
 	auto lookup = s_indexMapping.find(vertex);
 
@@ -513,14 +573,18 @@ void ParseAnimation(FbxNode* node)
 {
 	FbxGeometry* geo = node->GetGeometry();
 
-	s_rootMatrix.SetIdentity();
+	if (s_id <= 0)
+	{
+		s_rootMatrix.SetIdentity();
 
-	const FbxVector4 T = node->GetGeometricTranslation(FbxNode::eSourcePivot);
-	const FbxVector4 R = node->GetGeometricRotation(FbxNode::eSourcePivot);
-	const FbxVector4 S = node->GetGeometricScaling(FbxNode::eSourcePivot);
+		const FbxVector4 T = node->GetGeometricTranslation(FbxNode::eSourcePivot);
+		const FbxVector4 R = node->GetGeometricRotation(FbxNode::eSourcePivot);
+		const FbxVector4 S = node->GetGeometricScaling(FbxNode::eSourcePivot);
 
-	s_rootMatrix = FbxAMatrix(T, R, S);
+		s_rootMatrix = FbxAMatrix(T, R, S);
 
+	}
+	
 	uint deformerCount = geo->GetDeformerCount();
 
 	std::cout << "deformer: " << deformerCount << std::endl;
@@ -561,6 +625,7 @@ void ParseAnimation(FbxNode* node)
 
 			uint IndicesCount = cluster->GetControlPointIndicesCount();
 
+			std::cout<< "indicesCount: " << IndicesCount << std::endl;
 			for (uint i = 0; i < IndicesCount; ++i)
 			{
 				sun::BlendingIndexWeightPair blendingIndexWeightPair;
@@ -598,7 +663,7 @@ void ParseAnimation(FbxNode* node)
 		}
 	}
 
-	// 4개이하 가중치 0처리
+	// 8개이하 가중치 0처리
 	sun::BlendingIndexWeightPair blendingIndexWeightPair;
 
 	blendingIndexWeightPair.blendingIndex = 0;
@@ -606,7 +671,7 @@ void ParseAnimation(FbxNode* node)
 
 	for (uint rawPositionIndex = 0; rawPositionIndex < s_rawPositionCount; ++rawPositionIndex)
 	{
-		for (uint i = s_rawPositions[rawPositionIndex].blendingInfo.size(); i <= 4; ++i)
+		for (uint i = s_rawPositions[rawPositionIndex].blendingInfo.size(); i <= 8; ++i)
 		{
 			s_rawPositions[rawPositionIndex].blendingInfo.push_back(blendingIndexWeightPair);
 		}

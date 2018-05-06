@@ -6,6 +6,7 @@ namespace sun
 	: m_name(name), m_vertexWithBlending(vertexWithBlending), m_indexBuffer(indices), m_skeleton(skeleton), m_animationLength((byte)animationLength)
 	{
 		m_vertexBuffer.resize(animationLength);
+		std::cout << "vertexWithBlending.length: " << vertexWithBlending.size() << std::endl;
 
 		std::cout << "animation: " << animationLength << std::endl;
 		
@@ -23,16 +24,19 @@ namespace sun
 					float weight2 = m_vertexWithBlending[j].position.blendingInfo[1].blendingWeight;
 					float weight3 = m_vertexWithBlending[j].position.blendingInfo[2].blendingWeight;
 					float weight4 = m_vertexWithBlending[j].position.blendingInfo[3].blendingWeight;
+					
 
 					uint index1 = m_vertexWithBlending[j].position.blendingInfo[0].blendingIndex;
 					uint index2 = m_vertexWithBlending[j].position.blendingInfo[1].blendingIndex;
 					uint index3 = m_vertexWithBlending[j].position.blendingInfo[2].blendingIndex;
 					uint index4 = m_vertexWithBlending[j].position.blendingInfo[3].blendingIndex;
+				
 
 					KeyFrame* anim1 = m_skeleton[index1].animation;
 					KeyFrame* anim2 = m_skeleton[index2].animation;
 					KeyFrame* anim3 = m_skeleton[index3].animation;
 					KeyFrame* anim4 = m_skeleton[index4].animation;
+		
 
 
 					for (int time = 0; time < i; ++time)
@@ -41,6 +45,7 @@ namespace sun
 						anim2 = anim2->next;
 						anim3 = anim3->next;
 						anim4 = anim4->next;
+				
 					}
 
 
@@ -49,6 +54,7 @@ namespace sun
 					FbxAMatrix a2 = anim2->globalTransform *  m_skeleton[index2].globalBindPositionInverse;
 					FbxAMatrix a3 = anim3->globalTransform *  m_skeleton[index3].globalBindPositionInverse;
 					FbxAMatrix a4 = anim4->globalTransform *  m_skeleton[index4].globalBindPositionInverse;
+			
 
 					FbxVector4 pos = { position.x, position.y, position.z, 1 };
 					FbxVector4 tmp = { position.x, position.y, position.z, 1 };
@@ -58,33 +64,36 @@ namespace sun
 					a2 = a2.Transpose();
 					a3 = a3.Transpose();
 					a4 = a4.Transpose();
+					
 
-					float a11 = a1.Get(0, 0) * tmp[0] + a1.Get(0, 1) * tmp[1] + a1.Get(0, 2) * tmp[2] + a1.Get(0, 3);// *tmp[3];
-					float b11 = a1.Get(1, 0) * tmp[0] + a1.Get(1, 1) * tmp[1] + a1.Get(1, 2) * tmp[2] + a1.Get(1, 3);// * tmp[3];
-					float c11 = a1.Get(2, 0) * tmp[0] + a1.Get(2, 1) * tmp[1] + a1.Get(2, 2) * tmp[2] + a1.Get(2, 3);// * tmp[3];
-
-
-					float a22 = a2.Get(0, 0) * tmp[0] + a2.Get(0, 1) * tmp[1] + a2.Get(0, 2) * tmp[2] + a2.Get(0, 3);// * tmp[3];
-					float b22 = a2.Get(1, 0) * tmp[0] + a2.Get(1, 1) * tmp[1] + a2.Get(1, 2) * tmp[2] + a2.Get(1, 3);// * tmp[3];
-					float c22 = a2.Get(2, 0) * tmp[0] + a2.Get(2, 1) * tmp[1] + a2.Get(2, 2) * tmp[2] + a2.Get(2, 3);// * tmp[3];
-
-					float a33 = a3.Get(0, 0) * tmp[0] + a3.Get(0, 1) * tmp[1] + a3.Get(0, 2) * tmp[2] + a3.Get(0, 3);// * tmp[3];
-					float b33 = a3.Get(1, 0) * tmp[0] + a3.Get(1, 1) * tmp[1] + a3.Get(1, 2) * tmp[2] + a3.Get(1, 3);// * tmp[3];
-					float c33 = a3.Get(2, 0) * tmp[0] + a3.Get(2, 1) * tmp[1] + a3.Get(2, 2) * tmp[2] + a3.Get(2, 3);// * tmp[3];
-
-					float a44 = a4.Get(0, 0) * tmp[0] + a4.Get(0, 1) * tmp[1] + a4.Get(0, 2) * tmp[2] + a4.Get(0, 3);// * tmp[3];
-					float b44 = a4.Get(1, 0) * tmp[0] + a4.Get(1, 1) * tmp[1] + a4.Get(1, 2) * tmp[2] + a4.Get(1, 3);// * tmp[3];
-					float c44 = a4.Get(2, 0) * tmp[0] + a4.Get(2, 1) * tmp[1] + a4.Get(2, 2) * tmp[2] + a4.Get(2, 3);// * tmp[3];
+					float a11 = a1.Get(0, 0) * tmp[0] + a1.Get(0, 1) * tmp[1] + a1.Get(0, 2) * tmp[2] + a1.Get(0, 3) * tmp[3];
+					float b11 = a1.Get(1, 0) * tmp[0] + a1.Get(1, 1) * tmp[1] + a1.Get(1, 2) * tmp[2] + a1.Get(1, 3) * tmp[3];
+					float c11 = a1.Get(2, 0) * tmp[0] + a1.Get(2, 1) * tmp[1] + a1.Get(2, 2) * tmp[2] + a1.Get(2, 3) * tmp[3];
 
 
+					float a22 = a2.Get(0, 0) * tmp[0] + a2.Get(0, 1) * tmp[1] + a2.Get(0, 2) * tmp[2] + a2.Get(0, 3) * tmp[3];
+					float b22 = a2.Get(1, 0) * tmp[0] + a2.Get(1, 1) * tmp[1] + a2.Get(1, 2) * tmp[2] + a2.Get(1, 3) * tmp[3];
+					float c22 = a2.Get(2, 0) * tmp[0] + a2.Get(2, 1) * tmp[1] + a2.Get(2, 2) * tmp[2] + a2.Get(2, 3) * tmp[3];
+
+					float a33 = a3.Get(0, 0) * tmp[0] + a3.Get(0, 1) * tmp[1] + a3.Get(0, 2) * tmp[2] + a3.Get(0, 3) * tmp[3];
+					float b33 = a3.Get(1, 0) * tmp[0] + a3.Get(1, 1) * tmp[1] + a3.Get(1, 2) * tmp[2] + a3.Get(1, 3) * tmp[3];
+					float c33 = a3.Get(2, 0) * tmp[0] + a3.Get(2, 1) * tmp[1] + a3.Get(2, 2) * tmp[2] + a3.Get(2, 3) * tmp[3];
+
+					float a44 = a4.Get(0, 0) * tmp[0] + a4.Get(0, 1) * tmp[1] + a4.Get(0, 2) * tmp[2] + a4.Get(0, 3) * tmp[3];
+					float b44 = a4.Get(1, 0) * tmp[0] + a4.Get(1, 1) * tmp[1] + a4.Get(1, 2) * tmp[2] + a4.Get(1, 3) * tmp[3];
+					float c44 = a4.Get(2, 0) * tmp[0] + a4.Get(2, 1) * tmp[1] + a4.Get(2, 2) * tmp[2] + a4.Get(2, 3) * tmp[3];
+
+
+				
 					if (weight1 > 0.0f)
 						pos = FbxVector4(a11, b11, c11, 1) * weight1;
 					if (weight2 > 0.0f)
-						pos = FbxVector4(a22, b22, c22, 1) * weight2;
+						pos += (FbxVector4(a22, b22, c22, 1) * weight2);
 					if (weight3 > 0.0f)
-						pos = FbxVector4(a33, b33, c33, 1) * weight3;
+						pos += (FbxVector4(a33, b33, c33, 1) * weight3);
 					if (weight4 > 0.0f)
-						pos = FbxVector4(a44, b44, c44, 1) * weight4;
+						pos += (FbxVector4(a44, b44, c44, 1) * weight4);
+					
 
 
 					vec3 result = { (float)pos[0], (float)pos[1], (float)pos[2] };
@@ -96,7 +105,6 @@ namespace sun
 		}
 		else
 		{
-			
 			std::cout << 333 << std::endl;
 			for (uint j = 0; j < m_vertexWithBlending.size(); ++j)
 			{
@@ -112,6 +120,8 @@ namespace sun
 			}
 		}
 				
+
+		
 
 
 		m_format.nameLength = name.length();
