@@ -73,6 +73,7 @@ namespace sun
 	{
 		vec3 pos;
 		std::vector<BlendingIndexWeightPair> blendingInfo;
+		int isSkinMesh = -1;
 
 		Position()
 		{
@@ -88,6 +89,7 @@ namespace sun
 		vec3 binormal;
 		vec3 tangent;
 		int id;
+		int isSkinMesh;
 
 		bool operator==(const VertexWithBlending& other) const
 		{

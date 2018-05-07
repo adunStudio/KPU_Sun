@@ -33,7 +33,7 @@ namespace sun
 		const vector<VertexWithBlending>& m_vertexWithBlending;
 		const vector<uint  >& m_indexBuffer;
 		const Skeleton      & m_skeleton;
-
+		const vector<vector<FbxAMatrix>>& forNotD;
 		vector<vector<Vertex>> m_vertexBuffer;
 
 		SUNFormat m_format;
@@ -44,7 +44,7 @@ namespace sun
 		void WriteBytes(FILE* file, const byte* data, uint size);
 
 	public:
-		SUNWriter(const String& name, const vector<VertexWithBlending>& vertexWithBlending, const vector<uint>& indices, const Skeleton skeleton, const size_t animationLength);
+		SUNWriter(const String& name, const vector<VertexWithBlending>& vertexWithBlending, const vector<uint>& indices, const Skeleton skeleton, const size_t animationLength, const vector<vector<FbxAMatrix>>& forNotD);
 		~SUNWriter() {};
 
 		void Write(const String& file);

@@ -12,11 +12,16 @@ using namespace std;
 using namespace sunny;
 using namespace maths;
 
+static int s_skinid;
 static int s_id = 0;
-
+static FbxSkin* s_skin = nullptr;
 static vector<sun::VertexWithBlending>                  s_vertices;     // 정점
 static vector<uint>                                     s_indices;      // 인덱스
 static unordered_map<sun::VertexWithBlending, uint>    s_indexMapping;  // 정점+인덱스 맵핑
+
+
+static vector<vector<FbxAMatrix>> forNotD;
+
 
 static sun::Position* s_rawPositions;                    // 정점 위치, 애니메이션
 static uint s_rawPositionCount = 0;
@@ -48,7 +53,7 @@ vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex);
 void      ParseAnimation(FbxNode* node);
 
 //void InsertVertex(const vec3& position, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent);
-void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent);
+void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent, int isSkin);
 
 int main()
 {
@@ -63,6 +68,9 @@ int main()
 	FbxManager*  manager = FbxManager::Create();
 	FbxScene*      scene = FbxScene::Create(manager, "scene");
 	FbxImporter* importer = FbxImporter::Create(manager, "");
+
+	forNotD.resize(100);
+	
 
 	int format = -1;
 
@@ -84,6 +92,7 @@ int main()
 		exit(1);
 	}
 
+	
 	if (importer->Import(scene))
 	{
 		// 씬 내의 좌표축을 바꾼다.
@@ -103,6 +112,8 @@ int main()
 		if (s_animStack)
 		{
 			FbxString animStackName = s_animStack->GetName();
+
+			std::cout << "animStackName" << animStackName << endl;
 			FbxTakeInfo* takeInfo = scene->GetTakeInfo(animStackName);
 
 			s_AnimationStart = takeInfo->mLocalTimeSpan.GetStart();
@@ -117,7 +128,7 @@ int main()
 
 		LoadNode(scene->GetRootNode());
 
-		sun::SUNWriter writer(s_name, s_vertices, s_indices, s_skeleton, s_AnimationLength);
+		sun::SUNWriter writer(s_name, s_vertices, s_indices, s_skeleton, s_AnimationLength, forNotD);
 		writer.Write(s_outputName);
 	}
 
@@ -141,6 +152,11 @@ void LoadJoint(FbxNode* node, int depth, int index, int parentIndex)
 		sun::Joint joint;
 		joint.parentIndex = parentIndex;
 		joint.name = node->GetName();
+
+		for (int i = 0; i < parentIndex; ++i)
+			cout << "\t";
+
+		std::cout << "joint.name: " << joint.name << std::endl;
 
 		s_skeleton.push_back(joint);
 	}
@@ -245,8 +261,9 @@ bool ParseMesh(FbxMesh* mesh)
 			uv.y = 1.0f - uv.y;
 			//uv.x = 1.0f - uv.x;
 	
+			int isSkinMesh = s_rawPositions[controlPointIndex].isSkinMesh;
 			
-			InsertVertex(controlPointIndex, normal, uv, binormal, tangent);
+			InsertVertex(controlPointIndex, normal, uv, binormal, tangent, isSkinMesh);
 
 			vertexCount++;
 			
@@ -550,9 +567,9 @@ s_vertices.push_back(vertex);
 }
 }*/
 
-void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent)
+void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent, int isSkin)
 {
-	sun::VertexWithBlending vertex = { s_rawPositions[rawPositionIndex], normal, uv, binormal, tangent, s_id };
+	sun::VertexWithBlending vertex = { s_rawPositions[rawPositionIndex], normal, uv, binormal, tangent, s_id, isSkin };
 
 	auto lookup = s_indexMapping.find(vertex);
 
@@ -573,108 +590,135 @@ void ParseAnimation(FbxNode* node)
 {
 	FbxGeometry* geo = node->GetGeometry();
 
-	if (s_id <= 0)
-	{
-		s_rootMatrix.SetIdentity();
+	s_rootMatrix.SetIdentity();
 
-		const FbxVector4 T = node->GetGeometricTranslation(FbxNode::eSourcePivot);
-		const FbxVector4 R = node->GetGeometricRotation(FbxNode::eSourcePivot);
-		const FbxVector4 S = node->GetGeometricScaling(FbxNode::eSourcePivot);
+	const FbxVector4 T = node->GetGeometricTranslation(FbxNode::eSourcePivot);
+	const FbxVector4 R = node->GetGeometricRotation(FbxNode::eSourcePivot);
+	const FbxVector4 S = node->GetGeometricScaling(FbxNode::eSourcePivot);
 
-		s_rootMatrix = FbxAMatrix(T, R, S);
+	s_rootMatrix = FbxAMatrix(T, R, S);
 
-	}
 	
 	uint deformerCount = geo->GetDeformerCount();
 
-	std::cout << "deformer: " << deformerCount << std::endl;
-	// 보통 1개
-	for (int deformerIndex = 0; deformerIndex < deformerCount; ++deformerIndex)
+	if (deformerCount > 0)
 	{
-		FbxSkin* skin = reinterpret_cast<FbxSkin*>(geo->GetDeformer(deformerIndex, FbxDeformer::eSkin));
-
-		if (!skin) continue;
-
-		uint clusterCount = skin->GetClusterCount();
-
-		// 클러스터 안의 link가 joint 역할
-
-		for (uint clusterIndex = 0; clusterIndex < clusterCount; ++clusterIndex)
+		// 보통 1개
+		for (int deformerIndex = 0; deformerIndex < deformerCount; ++deformerIndex)
 		{
-			FbxCluster* cluster = skin->GetCluster(clusterIndex);
+			s_skin = reinterpret_cast<FbxSkin*>(geo->GetDeformer(deformerIndex, FbxDeformer::eSkin));
 
-			FbxAMatrix transformMatrix;
-			FbxAMatrix transformLinkMatrix;
-			FbxAMatrix globalBindposeInverseMatrix;
+			if (!s_skin) continue;
 
-			cluster->GetTransformMatrix(transformMatrix);
-			cluster->GetTransformLinkMatrix(transformLinkMatrix);
+			uint clusterCount = s_skin->GetClusterCount();
 
+			// 클러스터 안의 link가 joint 역할
 
-			globalBindposeInverseMatrix = transformLinkMatrix.Inverse() * transformMatrix * s_rootMatrix;
-			unsigned int jointIndex;
-
-			String jointName = cluster->GetLink()->GetName();
-			std::cout << jointName << std::endl;
-			for (uint i = 0; i < s_skeleton.size(); ++i)
-				if (s_skeleton[i].name == jointName)
-					jointIndex = i;
-
-			s_skeleton[jointIndex].globalBindPositionInverse = globalBindposeInverseMatrix;
-			s_skeleton[jointIndex].node = cluster->GetLink();
-
-			uint IndicesCount = cluster->GetControlPointIndicesCount();
-
-			std::cout<< "indicesCount: " << IndicesCount << std::endl;
-			for (uint i = 0; i < IndicesCount; ++i)
+			for (uint clusterIndex = 0; clusterIndex < clusterCount; ++clusterIndex)
 			{
-				sun::BlendingIndexWeightPair blendingIndexWeightPair;
+				FbxCluster* cluster = s_skin->GetCluster(clusterIndex);
 
-				blendingIndexWeightPair.blendingIndex = jointIndex;
-				blendingIndexWeightPair.blendingWeight = (float)(cluster->GetControlPointWeights()[i]);
-				s_rawPositions[cluster->GetControlPointIndices()[i]].blendingInfo.push_back(blendingIndexWeightPair);
+				FbxAMatrix transformMatrix;
+				FbxAMatrix transformLinkMatrix;
+				FbxAMatrix globalBindposeInverseMatrix;
+
+				cluster->GetTransformMatrix(transformMatrix);
+				cluster->GetTransformLinkMatrix(transformLinkMatrix);
+
+
+				globalBindposeInverseMatrix = transformLinkMatrix.Inverse() * transformMatrix * s_rootMatrix;
+				unsigned int jointIndex;
+
+				String jointName = cluster->GetLink()->GetName();
+				std::cout << jointName << std::endl;
+				for (uint i = 0; i < s_skeleton.size(); ++i)
+					if (s_skeleton[i].name == jointName)
+						jointIndex = i;
+
+				s_skeleton[jointIndex].globalBindPositionInverse = globalBindposeInverseMatrix;
+				s_skeleton[jointIndex].node = cluster->GetLink();
+
+				uint IndicesCount = cluster->GetControlPointIndicesCount();
+
+				std::cout << "indicesCount: " << IndicesCount << std::endl;
+
+				for (uint i = 0; i < IndicesCount; ++i)
+				{
+					sun::BlendingIndexWeightPair blendingIndexWeightPair;
+
+					blendingIndexWeightPair.blendingIndex = jointIndex;
+					blendingIndexWeightPair.blendingWeight = (float)(cluster->GetControlPointWeights()[i]);
+					s_rawPositions[cluster->GetControlPointIndices()[i]].blendingInfo.push_back(blendingIndexWeightPair);
+				}
+
+				// ㄴ조인트 설정 및 각 포지션별 조인트 인덱스 설정 완료
+
+				// 애니메이션 시작
+				sun::KeyFrame** anim = &s_skeleton[jointIndex].animation;
+
+				for (FbxLongLong i = s_AnimationStart.GetFrameCount(FbxTime::eFrames24); i <= s_AnimationEnd.GetFrameCount(FbxTime::eFrames24); ++i)
+				{
+					FbxTime time;
+					time.SetFrame(i, FbxTime::eFrames24);
+					*anim = new sun::KeyFrame();
+					(*anim)->frameNum = i;
+
+					const FbxVector4 Tr = cluster->GetLink()->GetGeometricTranslation(FbxNode::eSourcePivot);
+					const FbxVector4 Rr = cluster->GetLink()->GetGeometricRotation(FbxNode::eSourcePivot);
+					const FbxVector4 Sr = cluster->GetLink()->GetGeometricScaling(FbxNode::eSourcePivot);
+
+					//s_rootMatrix = ;
+
+					FbxAMatrix currentTransformOffset = node->EvaluateGlobalTransform(time) *FbxAMatrix(Tr, Rr, Sr);
+					FbxAMatrix globalTransform = /*currentTransformOffset.Inverse() */ cluster->GetLink()->EvaluateGlobalTransform(time);
+
+					(*anim)->globalTransform = globalTransform;
+
+					anim = &((*anim)->next);
+				}
 			}
+		}
 
-			// ㄴ조인트 설정 및 각 포지션별 조인트 인덱스 설정 완료
+		// 8개이하 가중치 0처리
+		sun::BlendingIndexWeightPair blendingIndexWeightPair;
 
-			// 애니메이션 시작
-			sun::KeyFrame** anim = &s_skeleton[jointIndex].animation;
+		blendingIndexWeightPair.blendingIndex = 0;
+		blendingIndexWeightPair.blendingWeight = 0;
 
-			for (FbxLongLong i = s_AnimationStart.GetFrameCount(FbxTime::eFrames24); i <= s_AnimationEnd.GetFrameCount(FbxTime::eFrames24); ++i)
+		for (uint rawPositionIndex = 0; rawPositionIndex < s_rawPositionCount; ++rawPositionIndex)
+		{
+			s_rawPositions[rawPositionIndex].isSkinMesh = -1;
+			for (uint i = s_rawPositions[rawPositionIndex].blendingInfo.size(); i <= 8; ++i)
 			{
-				FbxTime time;
-				time.SetFrame(i, FbxTime::eFrames24);
-				*anim = new sun::KeyFrame();
-				(*anim)->frameNum = i;
-
-				const FbxVector4 Tr = cluster->GetLink()->GetGeometricTranslation(FbxNode::eSourcePivot);
-				const FbxVector4 Rr = cluster->GetLink()->GetGeometricRotation(FbxNode::eSourcePivot);
-				const FbxVector4 Sr = cluster->GetLink()->GetGeometricScaling(FbxNode::eSourcePivot);
-
-				//s_rootMatrix = ;
-
-				FbxAMatrix currentTransformOffset = node->EvaluateGlobalTransform(time) *FbxAMatrix(Tr, Rr, Sr);
-				FbxAMatrix globalTransform = currentTransformOffset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(time);
-
-				(*anim)->globalTransform = globalTransform;
-
-				anim = &((*anim)->next);
+				s_rawPositions[rawPositionIndex].blendingInfo.push_back(blendingIndexWeightPair);
 			}
 		}
 	}
-
-	// 8개이하 가중치 0처리
-	sun::BlendingIndexWeightPair blendingIndexWeightPair;
-
-	blendingIndexWeightPair.blendingIndex = 0;
-	blendingIndexWeightPair.blendingWeight = 0;
-
-	for (uint rawPositionIndex = 0; rawPositionIndex < s_rawPositionCount; ++rawPositionIndex)
+	else
 	{
-		for (uint i = s_rawPositions[rawPositionIndex].blendingInfo.size(); i <= 8; ++i)
+		
+		for (FbxLongLong i = s_AnimationStart.GetFrameCount(FbxTime::eFrames24); i <= s_AnimationEnd.GetFrameCount(FbxTime::eFrames24); ++i)
 		{
-			s_rawPositions[rawPositionIndex].blendingInfo.push_back(blendingIndexWeightPair);
+			FbxTime time;
+			time.SetFrame(i, FbxTime::eFrames24);
+
+			FbxAMatrix currentTransformOffset = node->EvaluateGlobalTransform(time);
+			FbxAMatrix result = currentTransformOffset * s_rootMatrix;
+			//result = result.Inverse();
+
+			forNotD[s_skinid].push_back(result);
 		}
+
+		for (uint rawPositionIndex = 0; rawPositionIndex < s_rawPositionCount; ++rawPositionIndex)
+		{
+			s_rawPositions[rawPositionIndex].isSkinMesh = s_skinid;
+			
+		}
+
+		++s_skinid;
 	}
+	
+
+	
 
 }
