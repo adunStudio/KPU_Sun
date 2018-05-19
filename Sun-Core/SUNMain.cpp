@@ -52,8 +52,7 @@ vec2 ParseUV(const FbxMesh* mesh, int controlPointIndex, int inTextureUVIndex);
 
 void      ParseAnimation(FbxNode* node);
 
-//void InsertVertex(const vec3& position, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent);
-void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent, int isSkin);
+void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, float tid, int isSkin);
 
 int main()
 {
@@ -61,9 +60,9 @@ int main()
 
 	cin >> s_name;
 
-	s_inputName = "Meshes/" + s_name + ".fbx";
+	s_inputName = "bosslocker/" + s_name + ".fbx";
 	//s_outputName = "Meshes/" + s_name + ".fbx";
-	s_outputName = "C:/Users/adunstudio/Desktop/Sunny/Sunny-Core/04_ASSET/SUN/" + s_name + ".sun";
+	s_outputName = "C:/Users/adunstudio/Desktop/Sunny/Sunny-Core/04_ASSET/SUN/Characters/" + s_name + ".sun";
 
 	FbxManager*  manager = FbxManager::Create();
 	FbxScene*      scene = FbxScene::Create(manager, "scene");
@@ -247,13 +246,10 @@ bool ParseMesh(FbxMesh* mesh)
 		{
 			int controlPointIndex = mesh->GetPolygonVertex(triangle, i);
 			
-			vec3& position = s_rawPositions[controlPointIndex].pos;
-			vec3    normal = ParseNormal(mesh, controlPointIndex, vertexCount);
-			vec3  binormal = ParseBinormal(mesh, controlPointIndex, vertexCount);
-			//vec3   tangent = ParseTangent(mesh, controlPointIndex, vertexCount);
-			vec3   tangent = {1.0f *  id, 1.0f * id, 1.0f * id };// ParseTangent(mesh, controlPointIndex, vertexCount);
-			vec2        uv = ParseUV(mesh, controlPointIndex, mesh->GetTextureUVIndex(triangle, i));
-			
+			vec3& position  = s_rawPositions[controlPointIndex].pos;
+			vec3  normal    = ParseNormal(mesh, controlPointIndex, vertexCount);
+			vec2  uv        = ParseUV(mesh, controlPointIndex, mesh->GetTextureUVIndex(triangle, i));
+			float tid       = id;
 			
 			FbxGeometryElementMaterial* vertexMaterial =  mesh->GetElementMaterial(0);
 		
@@ -263,7 +259,7 @@ bool ParseMesh(FbxMesh* mesh)
 	
 			int isSkinMesh = s_rawPositions[controlPointIndex].isSkinMesh;
 			
-			InsertVertex(controlPointIndex, normal, uv, binormal, tangent, isSkinMesh);
+			InsertVertex(controlPointIndex, normal, uv, tid, isSkinMesh);
 
 			vertexCount++;
 			
@@ -567,9 +563,9 @@ s_vertices.push_back(vertex);
 }
 }*/
 
-void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, const vec3& binormal, const vec3& tangent, int isSkin)
+void InsertVertex(const uint rawPositionIndex, const vec3& normal, const vec2& uv, float tid, int isSkin)
 {
-	sun::VertexWithBlending vertex = { s_rawPositions[rawPositionIndex], normal, uv, binormal, tangent, s_id, isSkin };
+	sun::VertexWithBlending vertex = { s_rawPositions[rawPositionIndex], normal, uv, tid, isSkin };
 
 	auto lookup = s_indexMapping.find(vertex);
 

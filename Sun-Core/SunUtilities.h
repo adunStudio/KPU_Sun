@@ -86,24 +86,21 @@ namespace sun
 		Position position;
 		vec3 normal;
 		vec2 uv;
-		vec3 binormal;
-		vec3 tangent;
-		int id;
+		float tid;
 		int isSkinMesh;
 
 		bool operator==(const VertexWithBlending& other) const
 		{
-			return position.pos == other.position.pos && normal == other.normal && uv == other.uv && binormal == other.binormal && tangent == other.tangent;
+			return position.pos == other.position.pos && normal == other.normal && uv == other.uv;
 		}
 	};
 
 	struct Vertex
 	{
-		vec3 position;
-		vec3 normal;
-		vec2 uv;
-		vec3 binormal;
-		vec3 tangent;
+		vec3   position;
+		vec3   normal;
+		vec2   uv;
+		float  tid;
 	};
 }
 
@@ -112,6 +109,6 @@ struct std::hash<sun::VertexWithBlending>
 {
 	const size_t operator()(const sun::VertexWithBlending& key) const
 	{
-		return key.position.pos.GetHash() ^ key.normal.GetHash() ^ key.uv.GetHash() ^ key.binormal.GetHash() ^ key.tangent.GetHash() ^ key.id;
+		return key.position.pos.GetHash() ^ key.normal.GetHash() ^ key.uv.GetHash();
 	}
 };

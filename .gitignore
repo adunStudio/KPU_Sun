@@ -349,3 +349,8 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
+
+# FBX
+*.fbx
+*.FBX
+*/*.fbx

@@ -96,7 +96,7 @@ namespace sun
 
 
 						vec3 result = { (float)pos[0], (float)pos[1], (float)pos[2] };
-						Vertex v = { result, m_vertexWithBlending[j].normal, m_vertexWithBlending[j].uv, m_vertexWithBlending[j].binormal, m_vertexWithBlending[j].tangent };
+						Vertex v = { result, m_vertexWithBlending[j].normal, m_vertexWithBlending[j].uv, m_vertexWithBlending[j].tid };
 
 						m_vertexBuffer[i].push_back(v);
 					}
@@ -121,7 +121,7 @@ namespace sun
 
 
 						vec3 result = { (float)pos[0], (float)pos[1], (float)pos[2] };
-						Vertex v = { result, m_vertexWithBlending[j].normal, m_vertexWithBlending[j].uv, m_vertexWithBlending[j].binormal, m_vertexWithBlending[j].tangent };
+						Vertex v = { result, m_vertexWithBlending[j].normal, m_vertexWithBlending[j].uv, m_vertexWithBlending[j].tid };
 						m_vertexBuffer[i].push_back(v);
 
 					}
@@ -140,7 +140,7 @@ namespace sun
 
 
 				vec3 result = { (float)pos[0], (float)pos[1], (float)pos[2] };
-				Vertex v = { result, m_vertexWithBlending[j].normal, m_vertexWithBlending[j].uv, m_vertexWithBlending[j].binormal, m_vertexWithBlending[j].tangent };
+				Vertex v = { result, m_vertexWithBlending[j].normal, m_vertexWithBlending[j].uv, m_vertexWithBlending[j].tid };
 
 				m_vertexBuffer[0].push_back(v);
 		
